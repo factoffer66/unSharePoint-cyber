@@ -73,6 +73,11 @@ class Sharepoint:
             self.get_version(detected_version_share_point)
         else:
             self.logger.error("Unable to detect SharePoint version; get_version will not be executed.")
+            # ensure .sharepoint is always a dict so to_string() won't crash
+            self.target.sharepoint = {
+            "version": "Unknown",
+            "date": None
+            }
 
     def detect_sharepoint_by_headers(self, headers):
         self.logger.debug("detect_sharepoint_by_headers")
