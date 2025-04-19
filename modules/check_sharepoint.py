@@ -61,21 +61,18 @@ class Sharepoint:
 
     def check_share_point(self, headers):
         self.logger.debug("check_share_point")
-        # Detection by header parse
         detected_version_share_point = self.detect_sharepoint_by_headers(headers)
         if detected_version_share_point:
             self.logger.debug("SharePoint version Detected (headers parse): {}".format(detected_version_share_point))
-
-        # Detection by conf file parse #
-        if not detected_version_share_point:
+        else:
             detected_version_share_point = self.detect_sharepoint_by_servicefile()
             if detected_version_share_point:
-                self.logger.debug(
-                    "SharePoint version Detected (service.cnf parse): {}".format(detected_version_share_point))
+                self.logger.debug("SharePoint version Detected (service.cnf parse): {}".format(detected_version_share_point))
 
-        self.get_version(detected_version_share_point)
-
-
+        if detected_version_share_point:
+            self.get_version(detected_version_share_point)
+        else:
+            self.logger.error("Unable to detect SharePoint version; get_version will not be executed.")
 
     def detect_sharepoint_by_headers(self, headers):
         self.logger.debug("detect_sharepoint_by_headers")
