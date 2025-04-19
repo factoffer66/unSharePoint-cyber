@@ -3,7 +3,6 @@
 
 import sys
 import urllib3
-from datetime import datetime
 from libs.core.database import Database
 from libs.core.logger import Logger
 from libs.core.request import Request
@@ -20,63 +19,63 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def main():
     print_banner()
-    logger_instance = Logger()
-    logger = logger_instance.get_logger()
+    logger_inst = Logger()
+    logger = logger_inst.get_logger()
 
     try:
         args = gen_cli_args()
         if args.verbose:
-            logger_instance.enable_debug()
+            logger_inst.enable_debug()
 
-        # initialize request with optional NTLM creds
+        # initialize HTTP layer (with NTLM if given)
         Request(args.domain, args.username, args.password)
+
+        # set up our target
         tg = Target(args.url)
 
-        # update & verify database
+        # update DB if requested, then verify it’s in place
         db = Database()
         if args.update:
             db.update()
         db.verify_installation()
 
-        # SharePoint checks
+        # perform SharePoint checks
         sh = Sharepoint()
-        response_obj = sh.check_availability()
-        sh.check_iis_target(response_obj.headers)
-        sh.check_share_point(response_obj.headers)
+        resp = sh.check_availability()
+        sh.check_iis_target(resp.headers)
+        sh.check_share_point(resp.headers)
 
-        # only run CVE lookup if we detected a real numeric version
+        # only run CVE lookup when we have a real version string
         sp = tg.sharepoint or {}
-        version = sp.get("version", "").lower()
-        if version and version != "unknown":
+        ver = sp.get("version", "").lower()
+        if ver and ver != "unknown":
             CheckCVE().get_cve()
         else:
             logger.info("Skipping CVE check: SharePoint version is unknown.")
 
-        # optional API scan
+        # optional SOAP/API scan
         if args.type in ('a', 'ad'):
             CheckSoapApi().check_soap_api(detailed=(args.type == 'ad'))
 
-        # brute‐force & enumeration
+        # brute‑force or user enumeration
         if args.bruteforce:
             BruteForce(args.domain, args.username_file, args.password_file).bruteforce()
         if args.enum_users:
             UserEnum().user_enumeration()
 
+        # final summary
         logger.info("Scan completed!")
         logger.info("Results:")
 
-        # gracefully handle missing/None date in tg.to_string()
-        try:
+        # if we lack a release date, skip to_string() entirely
+        date_val = sp.get("date")
+        if date_val is None:
+            # clean fallback without any exception
+            version_str = sp.get("version", "Unknown")
+            logger.info(f"SharePoint version: {version_str}, release date: N/A")
+        else:
+            # we have a date, so to_string() will format it properly
             logger.info(tg.to_string())
-        except AttributeError as e:
-            logger.error(f"Could not format results: {e}")
-            # fallback manual print
-            date_val = sp.get("date")
-            if isinstance(date_val, datetime):
-                date_str = date_val.strftime("%Y-%m-%d")
-            else:
-                date_str = "N/A"
-            logger.info(f"SharePoint version: {sp.get('version', 'Unknown')}, release date: {date_str}")
 
     except (KeyboardInterrupt, SystemExit):
         sys.exit(2)
